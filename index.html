@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chốt Lịch Đi Chơi - Tìm Ngày Cả Bọn Cùng Rảnh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .day-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+        .day-card:active {
+            transform: scale(0.96);
+        }
+        .pulse-badge {
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-3 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-xl">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toast-msg" class="font-medium text-sm">Đã lưu thay đổi!</span>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner">
+                    🗓️
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 id="event-title-display" class="text-xl sm:text-2xl font-extrabold tracking-tight cursor-pointer hover:underline decoration-white/50 underline-offset-4" onclick="promptEditTitle()" title="Nhấn để đổi tên kèo">
+                            Kèo Đi Chơi Cuối Tuần 🍻
+                        </h1>
+                        <button onclick="promptEditTitle()" class="text-white/80 hover:text-white text-xs bg-white/10 p-1.5 rounded-lg" title="Đổi tên kèo">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                    </div>
+                    <p class="text-xs sm:text-sm text-indigo-100 font-medium">Đánh dấu ngày bạn <span class="bg-rose-500/90 text-white px-1.5 py-0.5 rounded font-bold">BẬN</span> — Hệ thống sẽ tìm ra ngày cả hội cùng rảnh!</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <button onclick="loadDemoData()" class="bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 border border-white/20 shadow-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i> Tạo dữ liệu mẫu
+                </button>
+                <button onclick="openShareModal()" class="bg-white text-indigo-700 hover:bg-indigo-50 text-xs sm:text-sm font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md">
+                    <i class="fa-solid fa-share-nodes"></i> Chia sẻ / Gộp lịch
+                </button>
+                <button onclick="confirmResetAll()" class="bg-rose-500/80 hover:bg-rose-600 text-white text-xs sm:text-sm font-semibold px-3 py-2 rounded-xl transition" title="Xóa toàn bộ làm lại từ đầu">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+
+        <!-- Step 1: Date Range Config Bar -->
+        <section class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center text-sm shrink-0">1</span>
+                <div>
+                    <h2 class="font-bold text-slate-800 text-sm sm:text-base">Khoảng thời gian khảo sát</h2>
+                    <p class="text-xs text-slate-500" id="date-range-summary">Đang hiển thị 14 ngày</p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                <div class="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+                    <button onclick="setQuickRange(7)" id="btn-range-7" class="px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900">7 ngày tới</button>
+                    <button onclick="setQuickRange(14)" id="btn-range-14" class="px-3 py-1.5 rounded-lg transition bg-white text-indigo-600 shadow-sm">14 ngày tới</button>
+                    <button onclick="setQuickRange(30)" id="btn-range-30" class="px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900">30 ngày tới</button>
+                </div>
+
+                <div class="flex items-center gap-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                    <span class="text-slate-500 font-medium">Từ:</span>
+                    <input type="date" id="start-date" onchange="handleCustomDateChange()" class="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer">
+                    <span class="text-slate-400">→</span>
+                    <span class="text-slate-500 font-medium">Đến:</span>
+                    <input type="date" id="end-date" onchange="handleCustomDateChange()" class="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer">
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 2: Friends & Busy Schedule Picker -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Column: Member List (4 cols on lg) -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+                <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center text-sm">2</span>
+                            <div>
+                                <h2 class="font-bold text-slate-800 text-base">Danh sách hội bạn</h2>
+                                <p class="text-xs text-slate-500">Chọn tên bạn để tích ngày bận</p>
+                            </div>
+                        </div>
+                        <span id="member-count-badge" class="bg-indigo-50 text-indigo-700 font-bold text-xs px-2.5 py-1 rounded-full">0 người</span>
+                    </div>
+
+                    <!-- Add Member Input -->
+                    <form onsubmit="handleAddMember(event)" class="flex gap-2 mb-4">
+                        <div class="relative flex-grow">
+                            <input type="text" id="new-member-input" placeholder="Nhập tên bạn (VD: Minh, Lan...)" maxlength="25"
+                                class="w-full pl-3.5 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-medium">
+                        </div>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5 shrink-0 shadow-sm">
+                            <i class="fa-solid fa-plus"></i> Thêm
+                        </button>
+                    </form>
+
+                    <!-- Members List Container -->
+                    <div id="members-list" class="space-y-2 max-h-[380px] overflow-y-auto pr-1 flex-grow">
+                        <!-- Rendered by JS -->
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+                        <span>💡 Ai không bận ngày nào thì để trống (0 ngày bận).</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Interactive Busy Calendar for Selected Member (8 cols on lg) -->
+            <div class="lg:col-span-8">
+                <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 h-full flex flex-col">
+                    <!-- Selected Member Banner -->
+                    <div id="calendar-header-banner" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <div id="active-member-avatar" class="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-extrabold text-lg flex items-center justify-center shadow-md shrink-0">
+                                ?
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Đang chọn lịch của:</span>
+                                    <span id="active-member-status" class="text-xs text-slate-500"></span>
+                                </div>
+                                <h3 id="active-member-name" class="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">Chưa chọn thành viên</h3>
+                            </div>
+                        </div>
+
+                        <!-- Quick Actions for Selected Member -->
+                        <div id="member-quick-actions" class="flex flex-wrap items-center gap-2">
+                            <button onclick="markAllFreeForActive()" class="text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl transition flex items-center gap-1.5 border border-emerald-200/60">
+                                <i class="fa-solid fa-check-double"></i> Rảnh tất cả các ngày
+                            </button>
+                            <button onclick="markWeekdaysBusyForActive()" class="text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 px-3 py-2 rounded-xl transition flex items-center gap-1.5 border border-amber-200/60" title="Đánh dấu bận từ Thứ 2 đến Thứ 6">
+                                <i class="fa-solid fa-briefcase"></i> Bận T2-T6 (Chỉ rảnh cuối tuần)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Mode Brush Selector -->
+                    <div id="brush-toolbar" class="bg-slate-50 p-3 rounded-2xl mb-4 border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                            <i class="fa-solid fa-hand-pointer text-indigo-600"></i>
+                            <span>Chế độ bấm vào ô ngày:</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5" id="brush-buttons">
+                            <button onclick="setBrushMode('FULL')" data-brush="FULL" class="brush-btn active-brush text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 bg-rose-600 text-white border-rose-600 shadow-sm">
+                                <span class="w-2 h-2 rounded-full bg-white"></span> Bận cả ngày
+                            </button>
+                            <button onclick="setBrushMode('MORNING')" data-brush="MORNING" class="brush-btn text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition flex items-center gap-1 bg-white text-slate-700 border-slate-200 hover:bg-amber-50">
+                                ☀️ Bận Sáng
+                            </button>
+                            <button onclick="setBrushMode('AFTERNOON')" data-brush="AFTERNOON" class="brush-btn text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition flex items-center gap-1 bg-white text-slate-700 border-slate-200 hover:bg-amber-50">
+                                🌤️ Bận Chiều
+                            </button>
+                            <button onclick="setBrushMode('EVENING')" data-brush="EVENING" class="brush-btn text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition flex items-center gap-1 bg-white text-slate-700 border-slate-200 hover:bg-amber-50">
+                                🌙 Bận Tối
+                            </button>
+                            <button onclick="setBrushMode('NOTE')" data-brush="NOTE" class="brush-btn text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition flex items-center gap-1 bg-white text-slate-700 border-slate-200 hover:bg-indigo-50" title="Thêm ghi chú cho ngày">
+                                📝 Ghi chú
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div id="calendar-grid-container" class="flex-grow">
+                        <div class="grid grid-cols-7 gap-1.5 sm:gap-2 mb-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">
+                            <div>T2</div>
+                            <div>T3</div>
+                            <div>T4</div>
+                            <div>T5</div>
+                            <div>T6</div>
+                            <div class="text-indigo-500">T7</div>
+                            <div class="text-rose-500">CN</div>
+                        </div>
+                        <div id="calendar-days-grid" class="grid grid-cols-7 gap-1.5 sm:gap-2.5">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="mt-5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-md bg-emerald-50 border border-emerald-300 inline-block"></span> Rảnh cả ngày</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-md bg-amber-100 border border-amber-400 inline-block"></span> Bận 1-2 buổi</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-md bg-rose-500 inline-block"></span> Bận cả ngày</span>
+                        </div>
+                        <span class="text-slate-400 italic">Nhấn vào ô ngày để đánh dấu hoặc bỏ đánh dấu</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Results & Best Days Highlight -->
+        <section class="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 font-extrabold flex items-center justify-center text-base">3</span>
+                    <div>
+                        <h2 class="text-lg sm:text-xl font-extrabold text-slate-900">Kết Quả: Ngày Cả Bọn Cùng Rảnh 🎉</h2>
+                        <p class="text-xs sm:text-sm text-slate-500">Tự động phân tích từ lịch bận của tất cả thành viên trong nhóm</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+                        <button onclick="setFilterWeekendOnly(false)" id="filter-all-days" class="px-3 py-1.5 rounded-lg bg-white text-indigo-600 shadow-sm transition">Tất cả các ngày</button>
+                        <button onclick="setFilterWeekendOnly(true)" id="filter-weekend-only" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Chỉ T7 & Chủ Nhật</button>
+                    </div>
+                    <button onclick="copySummaryToClipboard()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-regular fa-copy"></i> Sao chép kết quả gửi nhóm
+                    </button>
+                </div>
+            </div>
+
+            <!-- Best Days Cards -->
+            <div id="results-highlight-area">
+                <!-- Rendered by JS -->
+            </div>
+
+            <!-- Matrix Heatmap Table -->
+            <div class="pt-2">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                        <i class="fa-solid fa-table-cells text-indigo-600"></i> Bảng tổng hợp chi tiết từng ngày
+                    </h3>
+                    <span class="text-xs text-slate-400">Cuộn ngang nếu bảng rộng</span>
+                </div>
+
+                <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead id="matrix-thead" class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                            <!-- Rendered by JS -->
+                        </thead>
+                        <tbody id="matrix-tbody" class="divide-y divide-slate-100">
+                            <!-- Rendered by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200/80 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+            <p>✨ Dữ liệu được lưu tự động trên trình duyệt của bạn.</p>
+            <p>Mẹo: Bấm <strong>"Sao chép kết quả gửi nhóm"</strong> để dán ngay vào Zalo / Messenger!</p>
+        </div>
+    </footer>
+
+    <!-- Modal: Note / Shift Editor for a Specific Date -->
+    <div id="day-detail-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-fade-in">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <span id="modal-member-badge" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">Thành viên</span>
+                    <h3 id="modal-date-title" class="text-lg font-extrabold text-slate-900 mt-1">Thứ Bảy, 14/11</h3>
+                </div>
+                <button onclick="closeDayDetailModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="py-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-2">Chọn buổi bận trong ngày này:</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" onclick="toggleModalSession('MORNING')" id="modal-btn-morning" class="p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1">
+                            <span class="text-lg">☀️</span>
+                            <span class="font-bold text-xs">Buổi Sáng</span>
+                            <span class="text-[10px] opacity-75" id="modal-status-morning">Đang rảnh</span>
+                        </button>
+                        <button type="button" onclick="toggleModalSession('AFTERNOON')" id="modal-btn-afternoon" class="p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1">
+                            <span class="text-lg">🌤️</span>
+                            <span class="font-bold text-xs">Buổi Chiều</span>
+                            <span class="text-[10px] opacity-75" id="modal-status-afternoon">Đang rảnh</span>
+                        </button>
+                        <button type="button" onclick="toggleModalSession('EVENING')" id="modal-btn-evening" class="p-3 rounded-2xl border text-center transition flex flex-col items-center gap-1">
+                            <span class="text-lg">🌙</span>
+                            <span class="font-bold text-xs">Buổi Tối</span>
+                            <span class="text-[10px] opacity-75" id="modal-status-evening">Đang rảnh</span>
+                        </button>
+                    </div>
+                    <div class="flex gap-2 mt-2">
+                        <button type="button" onclick="setModalFullBusy(true)" class="flex-1 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition">
+                            Bận cả ngày
+                        </button>
+                        <button type="button" onclick="setModalFullBusy(false)" class="flex-1 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition">
+                            Rảnh cả ngày
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1.5">Ghi chú (tùy chọn):</label>
+                    <input type="text" id="modal-note-input" placeholder="VD: Bận đi đám cưới trưa, sau 6h tối rảnh..." maxlength="60"
+                        class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button onclick="saveDayDetailModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-md">
+                    Lưu chi tiết ngày này
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Title / Confirm Reset / Share & Merge JSON -->
+    <div id="share-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-share-nodes text-indigo-600"></i> Chia sẻ hoặc Gộp lịch bạn bè
+                </h3>
+                <button onclick="closeShareModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs sm:text-sm">
+                <div class="bg-indigo-50/80 border border-indigo-100 rounded-2xl p-3.5 text-indigo-950">
+                    <p class="font-bold mb-1">💡 Cách dùng cho nhóm nhiều người:</p>
+                    <ul class="list-disc list-inside space-y-1 text-xs text-indigo-800">
+                        <li><strong>Cách 1 (Nhanh nhất):</strong> Bạn hỏi lịch bận của mọi người trong nhóm chat rồi tích hộ vào bảng này, sau đó bấm <em>"Sao chép kết quả gửi nhóm"</em>.</li>
+                        <li><strong>Cách 2 (Gửi mã):</strong> Sao chép mã dữ liệu bên dưới gửi cho bạn bè nhập vào máy họ, hoặc bảo bạn bè gửi mã của họ để bạn bấm <strong>"Gộp thêm vào lịch hiện tại"</strong>.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="font-bold text-slate-700 text-xs uppercase">Mã dữ liệu hiện tại:</label>
+                        <button onclick="copyExportCode()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            <i class="fa-regular fa-copy"></i> Sao chép mã này
+                        </button>
+                    </div>
+                    <textarea id="export-json-textarea" readonly rows="3" class="w-full p-3 text-xs font-mono bg-slate-100 border border-slate-200 rounded-xl text-slate-600 focus:outline-none"></textarea>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3">
+                    <label class="block font-bold text-slate-700 text-xs uppercase mb-1.5">Nhập / Gộp mã từ bạn bè:</label>
+                    <textarea id="import-json-textarea" rows="3" placeholder="Dán mã dữ liệu bạn bè gửi vào đây..." class="w-full p-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    <div class="flex gap-2 mt-2.5">
+                        <button onclick="importData(true)" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition">
+                            <i class="fa-solid fa-code-merge mr-1"></i> Gộp thêm thành viên vào bảng
+                        </button>
+                        <button onclick="importData(false)" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 px-3 rounded-xl text-xs transition">
+                            Thay thế toàn bộ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Prompt / Confirm Modal (No browser alert/confirm) -->
+    <div id="custom-dialog-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <h3 id="dialog-title" class="text-lg font-extrabold text-slate-900">Tiêu đề</h3>
+            <p id="dialog-desc" class="text-sm text-slate-600 hidden"></p>
+            <input type="text" id="dialog-input" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 hidden">
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeCustomDialog()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600">Hủy</button>
+                <button id="dialog-confirm-btn" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white">Đồng ý</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden textarea for reliable clipboard copy in iframe -->
+    <textarea id="clipboard-helper" class="fixed -top-96 opacity-0 pointer-events-none"></textarea>
+
+    <!-- BƯỚC 1: Dán 2 dòng thư viện này ngay TRƯỚC thẻ <script> (trên dòng 322) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+    <script>
+        // BƯỚC 2: Dán đoạn khởi tạo này ngay DƯỚI thẻ <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBJkz2NLfWkvzNjyS5n5hcNa_yEpuUS6ZY",
+            authDomain: "pick-busy-day.firebaseapp.com",
+            databaseURL: "https://pick-busy-day-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "pick-busy-day",
+            storageBucket: "pick-busy-day.firebasestorage.app",
+            messagingSenderId: "588165763514",
+            appId: "1:588165763514:web:777ee651f8915a62e74d83"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const scheduleRef = db.ref('lich_nhom');
+
+        // ==========================================
+        // STATE MANAGEMENT (Code cũ của bạn ở dòng 323 giữ nguyên từ đây trở xuống)
+        // ==========================================
+        const STORAGE_KEY = 'chot_lich_di_choi_v1';
+        
+        const AVATAR_COLORS = [
+            'bg-indigo-600', 'bg-rose-500', 'bg-emerald-600', 
+            'bg-amber-500', 'bg-purple-600', 'bg-cyan-600', 
+            'bg-pink-600', 'bg-teal-600', 'bg-orange-500'
+        ];
+
+        const VN_DAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+        const VN_DAYS_FULL = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+        let state = {
+            title: 'Kèo Đi Chơi Cuối Tuần 🍻',
+            startDate: '',
+            endDate: '',
+            activeMemberId: null,
+            brushMode: 'FULL', // 'FULL' | 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NOTE'
+            filterWeekendOnly: false,
+            // members: [{ id, name, color, busy: { 'YYYY-MM-DD': { sessions: ['MORNING','AFTERNOON','EVENING'], note: '' } } }]
+            members: []
+        };
+
+        let modalEditingDate = null;
+
+        // ==========================================
+        // INITIALIZATION & DATE HELPERS
+        // ==========================================
+        function formatDateISO(dateObj) {
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function parseDateISO(dateStr) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+
+        function formatVNDateShort(dateStr) {
+            const d = parseDateISO(dateStr);
+            const dayName = VN_DAYS_SHORT[d.getDay()];
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dayName}, ${dd}/${mm}`;
+        }
+
+        function formatVNDateFull(dateStr) {
+            const d = parseDateISO(dateStr);
+            const dayName = VN_DAYS_FULL[d.getDay()];
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dayName}, ngày ${dd}/${mm}/${d.getFullYear()}`;
+        }
+
+        function getDatesInRange(startStr, endStr) {
+            const dates = [];
+            let curr = parseDateISO(startStr);
+            const end = parseDateISO(endStr);
+            let safety = 0;
+            while (curr <= end && safety < 90) {
+                dates.push(formatDateISO(curr));
+                curr.setDate(curr.getDate() + 1);
+                safety++;
+            }
+            return dates;
+        }
+
+        function initApp() {
+            // Thay vì chỉ đọc local đơn thuần, ta sẽ ưu tiên lắng nghe Realtime từ Firebase
+            // Nhưng trước tiên vẫn đọc tạm localStorage để web hiện lên ngay lập tức không bị nháy trắng
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.startDate && parsed.endDate && Array.isArray(parsed.members)) {
+                        state = { ...state, ...parsed };
+                    }
+                } catch (e) {
+                    console.error('Không thể đọc dữ liệu cũ:', e);
+                }
+            }
+
+            // Default dates if not set
+            if (!state.startDate || !state.endDate) {
+                const today = new Date();
+                const future = new Date();
+                future.setDate(today.getDate() + 13); // 14 days total
+                state.startDate = formatDateISO(today);
+                state.endDate = formatDateISO(future);
+            }
+
+            // Load initial demo members if empty
+            if (state.members.length === 0) {
+                createDefaultSampleMembers();
+            }
+
+            if (!state.activeMemberId && state.members.length > 0) {
+                state.activeMemberId = state.members[0].id;
+            }
+
+            renderAll();
+
+            // ----------------------------------------------------
+            // KẾT NỐI FIREBASE REALTIME: Lắng nghe mọi thay đổi từ đám mây
+            // ----------------------------------------------------
+            scheduleRef.on('value', (snapshot) => {
+                const cloudData = snapshot.val();
+                if (cloudData) {
+                    // Chuẩn hóa lại mảng members và object busy (tránh lỗi khi Firebase xóa dữ liệu rỗng)
+                    const cleanMembers = (cloudData.members || []).map(m => {
+                        const cleanBusy = {};
+                        if (m.busy) {
+                            Object.keys(m.busy).forEach(dateKey => {
+                                cleanBusy[dateKey] = {
+                                    sessions: m.busy[dateKey].sessions || [],
+                                    note: m.busy[dateKey].note || ''
+                                };
+                            });
+                        }
+                        return {
+                            ...m,
+                            busy: cleanBusy
+                        };
+                    });
+
+                    state.title = cloudData.title || state.title;
+                    state.startDate = cloudData.startDate || state.startDate;
+                    state.endDate = cloudData.endDate || state.endDate;
+                    state.members = cleanMembers;
+
+                    // Giữ nguyên người đang chọn nếu hợp lệ, nếu không thì chọn người đầu tiên
+                    if (!state.activeMemberId || !state.members.some(m => m.id === state.activeMemberId)) {
+                        state.activeMemberId = state.members.length > 0 ? state.members[0].id : null;
+                    }
+
+                    renderAll();
+                } else {
+                    // Nếu database trên Firebase chưa có gì, đẩy dữ liệu hiện tại lên
+                    saveState();
+                }
+            });
+        }
+
+        function saveState() {
+            try {
+                // Vẫn lưu bản phụ vào máy để web phản hồi nhanh
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                
+                // Đẩy dữ liệu chung lên Firebase (loại bỏ activeMemberId để khi bạn bè bấm chọn tên của họ thì không làm nhảy tên đang chọn trên màn hình của bạn)
+                const dataToSync = {
+                    title: state.title,
+                    startDate: state.startDate,
+                    endDate: state.endDate,
+                    members: state.members
+                };
+                scheduleRef.set(dataToSync);
+            } catch (e) {
+                console.error('Lỗi lưu dữ liệu:', e);
+            }
+        }
+
+        function createDefaultSampleMembers() {
+            const dates = getDatesInRange(state.startDate, state.endDate);
+            const m1 = { id: 'm1', name: 'Minh (Trưởng nhóm)', color: AVATAR_COLORS[0], busy: {} };
+            const m2 = { id: 'm2', name: 'Hương Giang', color: AVATAR_COLORS[1], busy: {} };
+            const m3 = { id: 'm3', name: 'Tuấn Anh', color: AVATAR_COLORS[2], busy: {} };
+            const m4 = { id: 'm4', name: 'Bảo Ngọc', color: AVATAR_COLORS[4], busy: {} };
+
+            // Populate realistic busy dates so user sees immediate value
+            dates.forEach((dStr, idx) => {
+                const dayOfWeek = parseDateISO(dStr).getDay();
+                if (idx === 1 || idx === 4) {
+                    m1.busy[dStr] = { sessions: ['MORNING', 'AFTERNOON', 'EVENING'], note: 'Họp dự án công ty' };
+                }
+                if (dayOfWeek === 2 || dayOfWeek === 4) {
+                    m2.busy[dStr] = { sessions: ['EVENING'], note: 'Đi học tiếng Anh tối' };
+                }
+                if (idx === 2 || idx === 5) {
+                    m3.busy[dStr] = { sessions: ['MORNING', 'AFTERNOON', 'EVENING'], note: 'Về quê' };
+                }
+                if (idx === 1 || idx === 8) {
+                    m4.busy[dStr] = { sessions: ['MORNING', 'AFTERNOON'], note: 'Bận việc gia đình, tối rảnh' };
+                }
+            });
+
+            state.members = [m1, m2, m3, m4];
+            state.activeMemberId = m1.id;
+            saveState();
+        }
+
+        // ==========================================
+        // DATE RANGE HANDLERS
+        // ==========================================
+        function setQuickRange(daysCount) {
+            const today = new Date();
+            const end = new Date();
+            end.setDate(today.getDate() + (daysCount - 1));
+            state.startDate = formatDateISO(today);
+            state.endDate = formatDateISO(end);
+            
+            updateQuickRangeButtons(daysCount);
+            saveState();
+            renderAll();
+            showToast(`Đã chuyển sang khảo sát ${daysCount} ngày tới!`);
+        }
+
+        function updateQuickRangeButtons(activeDays) {
+            [7, 14, 30].forEach(d => {
+                const btn = document.getElementById(`btn-range-${d}`);
+                if (!btn) return;
+                if (d === activeDays) {
+                    btn.className = 'px-3 py-1.5 rounded-lg transition bg-white text-indigo-600 shadow-sm font-bold';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900';
+                }
+            });
+        }
+
+        function handleCustomDateChange() {
+            const startInput = document.getElementById('start-date').value;
+            const endInput = document.getElementById('end-date').value;
+            if (!startInput || !endInput) return;
+
+            let s = parseDateISO(startInput);
+            let e = parseDateISO(endInput);
+
+            if (e < s) {
+                e = new Date(s);
+                e.setDate(s.getDate() + 6);
+                showToast('Ngày kết thúc phải sau ngày bắt đầu!', 'warning');
+            }
+
+            // Limit max 60 days for clean UI
+            const diffDays = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+            if (diffDays > 60) {
+                e = new Date(s);
+                e.setDate(s.getDate() + 59);
+                showToast('Tối đa khảo sát 60 ngày một lần!', 'warning');
+            }
+
+            state.startDate = formatDateISO(s);
+            state.endDate = formatDateISO(e);
+            updateQuickRangeButtons(diffDays);
+            saveState();
+            renderAll();
+        }
+
+        // ==========================================
+        // MEMBER MANAGEMENT
+        // ==========================================
+        function handleAddMember(e) {
+            e.preventDefault();
+            const input = document.getElementById('new-member-input');
+            const name = input.value.trim();
+            if (!name) {
+                showToast('Vui lòng nhập tên thành viên!', 'warning');
+                return;
+            }
+
+            const newId = 'mem_' + Date.now();
+            const color = AVATAR_COLORS[state.members.length % AVATAR_COLORS.length];
+            state.members.push({
+                id: newId,
+                name: name,
+                color: color,
+                busy: {}
+            });
+
+            state.activeMemberId = newId;
+            input.value = '';
+            saveState();
+            renderAll();
+            showToast(`Đã thêm "${name}"! Hãy tích chọn những ngày ${name} bận.`);
+        }
+
+        function selectMember(id) {
+            state.activeMemberId = id;
+            saveState();
+            renderAll();
+        }
+
+        function deleteMember(id, event) {
+            event.stopPropagation();
+            const mem = state.members.find(m => m.id === id);
+            if (!mem) return;
+
+            state.members = state.members.filter(m => m.id !== id);
+            if (state.activeMemberId === id) {
+                state.activeMemberId = state.members.length > 0 ? state.members[0].id : null;
+            }
+            saveState();
+            renderAll();
+            showToast(`Đã xóa ${mem.name} khỏi danh sách.`);
+        }
+
+        function getActiveMember() {
+            return state.members.find(m => m.id === state.activeMemberId) || null;
+        }
+
+        // ==========================================
+        // BUSY CALENDAR INTERACTION
+        // ==========================================
+        function setBrushMode(mode) {
+            state.brushMode = mode;
+            document.querySelectorAll('.brush-btn').forEach(btn => {
+                const bMode = btn.getAttribute('data-brush');
+                if (bMode === mode) {
+                    if (mode === 'FULL') {
+                        btn.className = 'brush-btn text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 bg-rose-600 text-white border-rose-600 shadow-sm';
+                    } else if (mode === 'NOTE') {
+                        btn.className = 'brush-btn text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 bg-indigo-600 text-white border-indigo-600 shadow-sm';
+                    } else {
+                        btn.className = 'brush-btn text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 bg-amber-500 text-white border-amber-500 shadow-sm';
+                    }
+                } else {
+                    btn.className = 'brush-btn text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition flex items-center gap-1 bg-white text-slate-700 border-slate-200 hover:bg-slate-100';
+                }
+            });
+        }
+
+        function handleDayCardClick(dateStr) {
+            const member = getActiveMember();
+            if (!member) {
+                showToast('Hãy thêm hoặc chọn một thành viên ở cột bên trái trước!', 'warning');
+                return;
+            }
+
+            if (state.brushMode === 'NOTE') {
+                openDayDetailModal(dateStr);
+                return;
+            }
+
+            if (!member.busy[dateStr]) {
+                member.busy[dateStr] = { sessions: [], note: '' };
+            }
+
+            const entry = member.busy[dateStr];
+
+            if (state.brushMode === 'FULL') {
+                // If already full busy -> clear to free
+                if (entry.sessions.length === 3) {
+                    delete member.busy[dateStr];
+                } else {
+                    entry.sessions = ['MORNING', 'AFTERNOON', 'EVENING'];
+                }
+            } else {
+                // Toggle specific session ('MORNING', 'AFTERNOON', 'EVENING')
+                const idx = entry.sessions.indexOf(state.brushMode);
+                if (idx > -1) {
+                    entry.sessions.splice(idx, 1);
+                } else {
+                    entry.sessions.push(state.brushMode);
+                }
+                if (entry.sessions.length === 0 && !entry.note) {
+                    delete member.busy[dateStr];
+                }
+            }
+
+            saveState();
+            renderAll();
+        }
+
+        function markAllFreeForActive() {
+            const member = getActiveMember();
+            if (!member) return;
+            member.busy = {};
+            saveState();
+            renderAll();
+            showToast(`${member.name} đã được đánh dấu RẢNH tất cả các ngày!`);
+        }
+
+        function markWeekdaysBusyForActive() {
+            const member = getActiveMember();
+            if (!member) return;
+            const dates = getDatesInRange(state.startDate, state.endDate);
+            dates.forEach(dStr => {
+                const day = parseDateISO(dStr).getDay();
+                if (day >= 1 && day <= 5) {
+                    member.busy[dStr] = {
+                        sessions: ['MORNING', 'AFTERNOON', 'EVENING'],
+                        note: 'Bận đi làm/đi học ngày thường'
+                    };
+                } else {
+                    delete member.busy[dStr];
+                }
+            });
+            saveState();
+            renderAll();
+            showToast(`Đã đánh dấu ${member.name} bận từ T2-T6, chỉ rảnh Cuối Tuần!`);
+        }
+
+        // ==========================================
+        // DAY DETAIL MODAL (SHIFT + NOTE)
+        // ==========================================
+        function openDayDetailModal(dateStr, event) {
+            if (event) event.stopPropagation();
+            const member = getActiveMember();
+            if (!member) return;
+
+            modalEditingDate = dateStr;
+            document.getElementById('modal-member-badge').textContent = member.name;
+            document.getElementById('modal-date-title').textContent = formatVNDateFull(dateStr);
+
+            const entry = member.busy[dateStr] || { sessions: [], note: '' };
+            document.getElementById('modal-note-input').value = entry.note || '';
+
+            updateModalSessionButtons(entry.sessions);
+            const modal = document.getElementById('day-detail-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDayDetailModal() {
+            const modal = document.getElementById('day-detail-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modalEditingDate = null;
+        }
+
+        let tempModalSessions = [];
+        function updateModalSessionButtons(sessions) {
+            tempModalSessions = [...sessions];
+            const map = [
+                { key: 'MORNING', btnId: 'modal-btn-morning', statusId: 'modal-status-morning' },
+                { key: 'AFTERNOON', btnId: 'modal-btn-afternoon', statusId: 'modal-status-afternoon' },
+                { key: 'EVENING', btnId: 'modal-btn-evening', statusId: 'modal-status-evening' }
+            ];
+
+            map.forEach(item => {
+                const isBusy = tempModalSessions.includes(item.key);
+                const btn = document.getElementById(item.btnId);
+                const st = document.getElementById(item.statusId);
+                if (isBusy) {
+                    btn.className = 'p-3 rounded-2xl border-2 border-rose-500 bg-rose-50 text-rose-700 text-center transition flex flex-col items-center gap-1 shadow-xs';
+                    st.textContent = 'Đang BẬN';
+                    st.className = 'text-[10px] font-bold text-rose-600';
+                } else {
+                    btn.className = 'p-3 rounded-2xl border border-slate-200 bg-emerald-50/40 text-slate-700 text-center transition flex flex-col items-center gap-1 hover:bg-slate-50';
+                    st.textContent = 'Rảnh';
+                    st.className = 'text-[10px] font-semibold text-emerald-600';
+                }
+            });
+        }
+
+        function toggleModalSession(sessionKey) {
+            const idx = tempModalSessions.indexOf(sessionKey);
+            if (idx > -1) {
+                tempModalSessions.splice(idx, 1);
+            } else {
+                tempModalSessions.push(sessionKey);
+            }
+            updateModalSessionButtons(tempModalSessions);
+        }
+
+        function setModalFullBusy(isBusy) {
+            if (isBusy) {
+                updateModalSessionButtons(['MORNING', 'AFTERNOON', 'EVENING']);
+            } else {
+                updateModalSessionButtons([]);
+            }
+        }
+
+        function saveDayDetailModal() {
+            const member = getActiveMember();
+            if (!member || !modalEditingDate) return;
+
+            const noteVal = document.getElementById('modal-note-input').value.trim();
+            if (tempModalSessions.length === 0 && !noteVal) {
+                delete member.busy[modalEditingDate];
+            } else {
+                member.busy[modalEditingDate] = {
+                    sessions: [...tempModalSessions],
+                    note: noteVal
+                };
+            }
+
+            saveState();
+            closeDayDetailModal();
+            renderAll();
+            showToast('Đã cập nhật chi tiết ngày!');
+        }
+
+        // ==========================================
+        // RENDER FUNCTIONS
+        // ==========================================
+        function renderAll() {
+            document.getElementById('event-title-display').textContent = state.title;
+            document.getElementById('start-date').value = state.startDate;
+            document.getElementById('end-date').value = state.endDate;
+
+            const dates = getDatesInRange(state.startDate, state.endDate);
+            document.getElementById('date-range-summary').textContent = 
+                `Khảo sát ${dates.length} ngày (${formatVNDateShort(state.startDate)} → ${formatVNDateShort(state.endDate)})`;
+
+            renderMembersList(dates);
+            renderActiveMemberCalendar(dates);
+            renderResultsAndMatrix(dates);
+        }
+
+        function renderMembersList(dates) {
+            const container = document.getElementById('members-list');
+            document.getElementById('member-count-badge').textContent = `${state.members.length} người`;
+
+            if (state.members.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <p class="text-slate-500 text-sm font-medium">Chưa có thành viên nào.</p>
+                        <p class="text-xs text-slate-400 mt-1">Hãy nhập tên bạn bè vào ô bên trên để bắt đầu!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = state.members.map(member => {
+                const isSelected = member.id === state.activeMemberId;
+                // Count busy days within current range
+                let busyCount = 0;
+                dates.forEach(d => {
+                    if (member.busy[d] && member.busy[d].sessions && member.busy[d].sessions.length > 0) {
+                        busyCount++;
+                    }
+                });
+
+                const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+                return `
+                    <div onclick="selectMember('${member.id}')" 
+                        class="group cursor-pointer p-3 rounded-2xl border transition-all flex items-center justify-between gap-2 ${
+                            isSelected 
+                            ? 'bg-indigo-50/90 border-indigo-500 shadow-xs ring-1 ring-indigo-500' 
+                            : 'bg-white hover:bg-slate-50 border-slate-200/80'
+                        }">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl ${member.color} text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                                ${initials}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <p class="font-bold text-sm text-slate-900 truncate">${escapeHtml(member.name)}</p>
+                                    ${isSelected ? '<span class="w-2 h-2 rounded-full bg-indigo-600"></span>' : ''}
+                                </div>
+                                <p class="text-xs ${busyCount > 0 ? 'text-rose-600 font-medium' : 'text-emerald-600 font-medium'}">
+                                    ${busyCount > 0 ? `Bận ${busyCount}/${dates.length} ngày` : 'Rảnh tất cả các ngày ✨'}
+                                </p>
+                            </div>
+                        </div>
+                        <button onclick="deleteMember('${member.id}', event)" 
+                            class="opacity-60 group-hover:opacity-100 hover:bg-rose-100 hover:text-rose-600 text-slate-400 w-7 h-7 rounded-lg flex items-center justify-center transition shrink-0"
+                            title="Xóa thành viên">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderActiveMemberCalendar(dates) {
+            const member = getActiveMember();
+            const avatarEl = document.getElementById('active-member-avatar');
+            const nameEl = document.getElementById('active-member-name');
+            const statusEl = document.getElementById('active-member-status');
+            const gridEl = document.getElementById('calendar-days-grid');
+
+            if (!member) {
+                avatarEl.textContent = '?';
+                avatarEl.className = 'w-12 h-12 rounded-2xl bg-slate-300 text-white font-extrabold text-lg flex items-center justify-center shrink-0';
+                nameEl.textContent = 'Hãy thêm thành viên ở bên trái';
+                statusEl.textContent = '';
+                gridEl.innerHTML = `<div class="col-span-7 py-12 text-center text-slate-400 text-sm">Chưa có thành viên để hiển thị lịch.</div>`;
+                return;
+            }
+
+            const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+            avatarEl.textContent = initials;
+            avatarEl.className = `w-12 h-12 rounded-2xl ${member.color} text-white font-extrabold text-lg flex items-center justify-center shadow-md shrink-0`;
+            nameEl.textContent = member.name;
+
+            // Calculate padding for Monday-first calendar grid
+            const firstDateObj = parseDateISO(dates[0]);
+            // JS getDay(): 0 is Sunday, 1 is Monday ... 6 is Saturday
+            // Convert to Monday=0 ... Sunday=6
+            const startOffset = (firstDateObj.getDay() + 6) % 7;
+
+            let html = '';
+            for (let i = 0; i < startOffset; i++) {
+                html += `<div class="rounded-2xl bg-slate-50/50 border border-transparent min-h-[78px] sm:min-h-[88px]"></div>`;
+            }
+
+            dates.forEach(dStr => {
+                const dObj = parseDateISO(dStr);
+                const dayNum = dObj.getDate();
+                const monthNum = dObj.getMonth() + 1;
+                const dayOfWeek = dObj.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+
+                const busyEntry = member.busy[dStr];
+                const sessions = busyEntry && busyEntry.sessions ? busyEntry.sessions : [];
+                const note = busyEntry && busyEntry.note ? busyEntry.note : '';
+
+                let cardStyle = 'bg-emerald-50/50 hover:bg-emerald-100/60 border-emerald-200/80 text-slate-800';
+                let badgeHtml = `<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded-md">Rảnh</span>`;
+
+                if (sessions.length === 3) {
+                    cardStyle = 'bg-rose-500 hover:bg-rose-600 border-rose-600 text-white shadow-sm';
+                    badgeHtml = `<span class="text-[10px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-md">Bận cả ngày</span>`;
+                } else if (sessions.length > 0) {
+                    cardStyle = 'bg-amber-100/90 hover:bg-amber-200/80 border-amber-400 text-amber-950';
+                    const labels = [];
+                    if (sessions.includes('MORNING')) labels.push('Sáng');
+                    if (sessions.includes('AFTERNOON')) labels.push('Chiều');
+                    if (sessions.includes('EVENING')) labels.push('Tối');
+                    badgeHtml = `<span class="text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-md">Bận: ${labels.join(', ')}</span>`;
+                }
+
+                html += `
+                    <div onclick="handleDayCardClick('${dStr}')" 
+                        class="day-card relative cursor-pointer rounded-2xl border p-2 sm:p-2.5 min-h-[80px] sm:min-h-[92px] flex flex-col justify-between ${cardStyle}">
+                        <div class="flex items-start justify-between gap-1">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase opacity-75 block">${VN_DAYS_SHORT[dayOfWeek]}</span>
+                                <span class="text-sm sm:text-base font-extrabold leading-tight">${dayNum}<span class="text-[11px] font-normal opacity-75">/${monthNum}</span></span>
+                            </div>
+                            <button onclick="openDayDetailModal('${dStr}', event)" 
+                                class="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] ${sessions.length === 3 ? 'hover:bg-white/20 text-white/90' : 'hover:bg-slate-200/70 text-slate-500'}"
+                                title="Tùy chỉnh buổi bận hoặc ghi chú">
+                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                            </button>
+                        </div>
+
+                        <div class="mt-1 flex flex-col gap-1">
+                            <div>${badgeHtml}</div>
+                            ${note ? `<p class="text-[10px] truncate opacity-90 font-medium" title="${escapeHtml(note)}">📝 ${escapeHtml(note)}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            gridEl.innerHTML = html;
+        }
+
+        // ==========================================
+        // RESULTS CALCULATION & MATRIX RENDER
+        // ==========================================
+        function setFilterWeekendOnly(val) {
+            state.filterWeekendOnly = val;
+            document.getElementById('filter-all-days').className = !val 
+                ? 'px-3 py-1.5 rounded-lg bg-white text-indigo-600 shadow-sm font-bold transition'
+                : 'px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+            document.getElementById('filter-weekend-only').className = val 
+                ? 'px-3 py-1.5 rounded-lg bg-white text-indigo-600 shadow-sm font-bold transition'
+                : 'px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+            renderAll();
+        }
+
+        function analyzeDates(dates) {
+            const totalMembers = state.members.length;
+            const analyzed = [];
+
+            dates.forEach(dStr => {
+                const dObj = parseDateISO(dStr);
+                const dayOfWeek = dObj.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+
+                if (state.filterWeekendOnly && !isWeekend) return;
+
+                const completelyFreeMembers = [];
+                const partiallyBusyMembers = [];
+                const fullBusyMembers = [];
+
+                // Also check free by specific session (Morning, Afternoon, Evening)
+                let freeMorningCount = 0;
+                let freeAfternoonCount = 0;
+                let freeEveningCount = 0;
+
+                state.members.forEach(m => {
+                    const entry = m.busy[dStr];
+                    const sessions = entry && entry.sessions ? entry.sessions : [];
+
+                    if (!sessions.includes('MORNING')) freeMorningCount++;
+                    if (!sessions.includes('AFTERNOON')) freeAfternoonCount++;
+                    if (!sessions.includes('EVENING')) freeEveningCount++;
+
+                    if (sessions.length === 0) {
+                        completelyFreeMembers.push(m);
+                    } else if (sessions.length === 3) {
+                        fullBusyMembers.push({ member: m, entry });
+                    } else {
+                        partiallyBusyMembers.push({ member: m, entry });
+                    }
+                });
+
+                // Available count = people who are completely free (or we also highlight if 100% free in evening)
+                const availableAllDayCount = completelyFreeMembers.length;
+                const availableIncludePartialCount = completelyFreeMembers.length + partiallyBusyMembers.length;
+
+                analyzed.push({
+                    dateStr: dStr,
+                    isWeekend,
+                    totalMembers,
+                    completelyFreeMembers,
+                    partiallyBusyMembers,
+                    fullBusyMembers,
+                    availableAllDayCount,
+                    availableIncludePartialCount,
+                    freeMorningCount,
+                    freeAfternoonCount,
+                    freeEveningCount
+                });
+            });
+
+            return analyzed;
+        }
+
+        function renderResultsAndMatrix(allDates) {
+            const highlightArea = document.getElementById('results-highlight-area');
+            const thead = document.getElementById('matrix-thead');
+            const tbody = document.getElementById('matrix-tbody');
+
+            if (state.members.length === 0) {
+                highlightArea.innerHTML = `<div class="p-6 text-center text-slate-400">Hãy thêm thành viên để xem kết quả phân tích.</div>`;
+                thead.innerHTML = '';
+                tbody.innerHTML = '';
+                return;
+            }
+
+            const analyzed = analyzeDates(allDates);
+            const total = state.members.length;
+
+            // 1. Days where 100% are completely free all day
+            const perfectDays = analyzed.filter(d => d.availableAllDayCount === total);
+
+            // 2. Days where everyone can meet in at least one session (e.g., 100% free Evening) even if someone is busy in the morning
+            const sessionPerfectDays = analyzed.filter(d => 
+                d.availableAllDayCount < total && 
+                (d.freeMorningCount === total || d.freeAfternoonCount === total || d.freeEveningCount === total)
+            );
+
+            // 3. Runner-up days (highest availableAllDayCount when no perfect days or for extra options)
+            const sortedByBest = [...analyzed].sort((a, b) => {
+                if (b.availableAllDayCount !== a.availableAllDayCount) {
+                    return b.availableAllDayCount - a.availableAllDayCount;
+                }
+                return b.availableIncludePartialCount - a.availableIncludePartialCount;
+            });
+
+            let highlightHtml = '';
+
+            if (perfectDays.length > 0) {
+                highlightHtml += `
+                    <div class="bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/70 border-2 border-emerald-400 rounded-3xl p-5 shadow-xs">
+                        <div class="flex items-center gap-2.5 mb-3">
+                            <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-wide pulse-badge">
+                                Tuyệt vời • 100% Cùng Rảnh (${total}/${total} người)
+                            </span>
+                            <span class="text-xs text-emerald-800 font-medium">Tìm thấy <strong>${perfectDays.length}</strong> ngày cả nhóm hoàn toàn rảnh rỗi!</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            ${perfectDays.map(d => `
+                                <div class="bg-white rounded-2xl p-3.5 border border-emerald-200 shadow-xs flex items-center justify-between">
+                                    <div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="font-extrabold text-slate-900 text-sm sm:text-base">${formatVNDateShort(d.dateStr)}</span>
+                                            ${d.isWeekend ? '<span class="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Cuối tuần</span>' : ''}
+                                        </div>
+                                        <p class="text-xs text-emerald-600 font-semibold mt-0.5">✅ Cả ${total} người rảnh cả ngày</p>
+                                    </div>
+                                    <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+                                        🎉
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                // No 100% all-day free -> show best alternatives
+                const bestScore = sortedByBest.length > 0 ? sortedByBest[0].availableAllDayCount : 0;
+                const runnerUps = sortedByBest.slice(0, 4);
+
+                highlightHtml += `
+                    <div class="bg-amber-50/90 border-2 border-amber-300 rounded-3xl p-5">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="px-3 py-1 rounded-full bg-amber-500 text-white font-extrabold text-xs uppercase">
+                                    Chưa có ngày 100% rảnh cả ngày
+                                </span>
+                                <span class="text-xs text-amber-900 font-medium">Dưới đây là những ngày <strong>đông đủ nhất</strong> để cả bọn cân nhắc:</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            ${runnerUps.map(d => {
+                                const busyNames = [
+                                    ...d.fullBusyMembers.map(x => `${x.member.name} (cả ngày)`),
+                                    ...d.partiallyBusyMembers.map(x => `${x.member.name} (bận 1 buổi)`)
+                                ];
+                                return `
+                                    <div class="bg-white rounded-2xl p-3.5 border border-amber-200 shadow-xs flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-extrabold text-slate-900 text-sm">${formatVNDateShort(d.dateStr)}</span>
+                                                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                                    ${d.availableAllDayCount}/${total} rảnh cả ngày
+                                                </span>
+                                            </div>
+                                            <p class="text-xs text-rose-600 mt-2 font-medium">
+                                                ⚠️ Vắng/Bận: ${busyNames.map(escapeHtml).join(', ')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Show session-specific 100% free days if any exist
+            if (sessionPerfectDays.length > 0) {
+                highlightHtml += `
+                    <div class="mt-3 bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4">
+                        <p class="text-xs font-bold text-indigo-900 mb-2">
+                            💡 Gợi ý thêm: Có ${sessionPerfectDays.length} ngày cả nhóm <span class="underline">100% cùng rảnh vào một buổi cụ thể</span>:
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            ${sessionPerfectDays.map(d => {
+                                const freeSessions = [];
+                                if (d.freeMorningCount === total) freeSessions.push('☀️ Buổi Sáng');
+                                if (d.freeAfternoonCount === total) freeSessions.push('🌤️ Buổi Chiều');
+                                if (d.freeEveningCount === total) freeSessions.push('🌙 Buổi Tối');
+                                return `
+                                    <div class="bg-white px-3 py-1.5 rounded-xl border border-indigo-200 text-xs flex items-center gap-2 shadow-2xs">
+                                        <span class="font-bold text-slate-800">${formatVNDateShort(d.dateStr)}:</span>
+                                        <span class="text-indigo-600 font-semibold">100% rảnh ${freeSessions.join(', ')}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            highlightArea.innerHTML = highlightHtml;
+
+            // Render Matrix Table Header
+            thead.innerHTML = `
+                <tr>
+                    <th class="py-3 px-4 font-bold text-slate-700 sticky left-0 bg-slate-50 z-10 min-w-[135px]">Ngày / Thứ</th>
+                    <th class="py-3 px-4 font-bold text-slate-700 min-w-[150px]">Độ rảnh cả nhóm</th>
+                    ${state.members.map(m => `
+                        <th class="py-3 px-3 font-bold text-center min-w-[100px]">
+                            <div class="flex flex-col items-center gap-1">
+                                <span class="w-6 h-6 rounded-lg ${m.color} text-white text-[10px] flex items-center justify-center font-extrabold">
+                                    ${m.name.slice(0, 2).toUpperCase()}
+                                </span>
+                                <span class="truncate max-w-[90px] text-slate-800">${escapeHtml(m.name)}</span>
+                            </div>
+                        </th>
+                    `).join('')}
+                </tr>
+            `;
+
+            // Render Matrix Table Body
+            tbody.innerHTML = analyzed.map(row => {
+                const isPerfect = row.availableAllDayCount === total;
+                const pct = Math.round((row.availableAllDayCount / total) * 100);
+                
+                let barColor = 'bg-emerald-500';
+                if (pct < 100 && pct >= 60) barColor = 'bg-amber-500';
+                else if (pct < 60) barColor = 'bg-rose-500';
+
+                return `
+                    <tr class="${isPerfect ? 'bg-emerald-50/50 hover:bg-emerald-50' : 'hover:bg-slate-50'} transition">
+                        <td class="py-3 px-4 font-bold sticky left-0 ${isPerfect ? 'bg-emerald-50/90' : 'bg-white'} z-10 border-r border-slate-100">
+                            <div class="flex items-center gap-1.5">
+                                <span class="${row.isWeekend ? 'text-indigo-700' : 'text-slate-800'}">${formatVNDateShort(row.dateStr)}</span>
+                                ${isPerfect ? '<span title="100% Rảnh">🌟</span>' : ''}
+                            </div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden max-w-[90px]">
+                                    <div class="${barColor} h-full rounded-full" style="width: ${pct}%"></div>
+                                </div>
+                                <span class="text-xs font-bold ${isPerfect ? 'text-emerald-700' : 'text-slate-600'}">
+                                    ${row.availableAllDayCount}/${total}
+                                </span>
+                            </div>
+                        </td>
+                        ${state.members.map(m => {
+                            const entry = m.busy[row.dateStr];
+                            const sessions = entry && entry.sessions ? entry.sessions : [];
+                            const note = entry && entry.note ? entry.note : '';
+
+                            if (sessions.length === 0) {
+                                return `
+                                    <td class="py-2.5 px-2 text-center">
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100/80 text-emerald-700 font-bold text-[11px]">
+                                            <i class="fa-solid fa-check"></i> Rảnh
+                                        </span>
+                                        ${note ? `<div class="text-[10px] text-slate-500 truncate max-w-[95px] mx-auto mt-0.5" title="${escapeHtml(note)}">${escapeHtml(note)}</div>` : ''}
+                                    </td>
+                                `;
+                            } else if (sessions.length === 3) {
+                                return `
+                                    <td class="py-2.5 px-2 text-center">
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 font-bold text-[11px]">
+                                            <i class="fa-solid fa-xmark"></i> Bận cả ngày
+                                        </span>
+                                        ${note ? `<div class="text-[10px] text-rose-500 truncate max-w-[95px] mx-auto mt-0.5" title="${escapeHtml(note)}">${escapeHtml(note)}</div>` : ''}
+                                    </td>
+                                `;
+                            } else {
+                                const sNames = [];
+                                if (sessions.includes('MORNING')) sNames.push('Sáng');
+                                if (sessions.includes('AFTERNOON')) sNames.push('Chiều');
+                                if (sessions.includes('EVENING')) sNames.push('Tối');
+                                return `
+                                    <td class="py-2.5 px-2 text-center">
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 text-amber-800 font-bold text-[11px]">
+                                            Bận ${sNames.join(',')}
+                                        </span>
+                                        ${note ? `<div class="text-[10px] text-amber-700 truncate max-w-[95px] mx-auto mt-0.5" title="${escapeHtml(note)}">${escapeHtml(note)}</div>` : ''}
+                                    </td>
+                                `;
+                            }
+                        }).join('')}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // SHARE, EXPORT/IMPORT & CLIPBOARD
+        // ==========================================
+        function copyTextToClipboard(text, successMsg) {
+            const helper = document.getElementById('clipboard-helper');
+            helper.value = text;
+            helper.select();
+            helper.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                showToast(successMsg || 'Đã sao chép vào bộ nhớ tạm!');
+            } catch (err) {
+                showToast('Không thể tự động sao chép, vui lòng copy thủ công.', 'warning');
+            }
+        }
+
+        function copySummaryToClipboard() {
+            const dates = getDatesInRange(state.startDate, state.endDate);
+            const analyzed = analyzeDates(dates);
+            const total = state.members.length;
+            const perfectDays = analyzed.filter(d => d.availableAllDayCount === total);
+
+            let lines = [];
+            lines.push(`🗓️ KẾT QUẢ CHỐT LỊCH: ${state.title.toUpperCase()}`);
+            lines.push(`👥 Thành viên (${total}): ${state.members.map(m => m.name).join(', ')}`);
+            lines.push(`--------------------------------`);
+
+            if (perfectDays.length > 0) {
+                lines.push(`✅ NGÀY CẢ BỌN CÙNG RẢNH 100% (${total}/${total} người):`);
+                perfectDays.forEach(d => {
+                    lines.push(`  🎉 ${formatVNDateFull(d.dateStr)}`);
+                });
+            } else {
+                lines.push(`⚠️ Chưa có ngày nào 100% rảnh cả ngày. Các ngày đông đủ nhất:`);
+                const topDays = [...analyzed].sort((a, b) => b.availableAllDayCount - a.availableAllDayCount).slice(0, 4);
+                topDays.forEach(d => {
+                    const busyList = [
+                        ...d.fullBusyMembers.map(x => x.member.name),
+                        ...d.partiallyBusyMembers.map(x => `${x.member.name} (bận 1 buổi)`)
+                    ];
+                    lines.push(`  🔸 ${formatVNDateShort(d.dateStr)}: ${d.availableAllDayCount}/${total} người rảnh (Vắng: ${busyList.join(', ')})`);
+                });
+            }
+
+            lines.push(`--------------------------------`);
+            lines.push(`👉 Mọi người vào xác nhận chốt ngày nhé!`);
+
+            copyTextToClipboard(lines.join('\n'), 'Đã sao chép kết quả! Hãy dán (Ctrl+V) vào nhóm Zalo/Messenger.');
+        }
+
+        function openShareModal() {
+            const exportArea = document.getElementById('export-json-textarea');
+            exportArea.value = JSON.stringify(state);
+            document.getElementById('import-json-textarea').value = '';
+            const modal = document.getElementById('share-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeShareModal() {
+            const modal = document.getElementById('share-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function copyExportCode() {
+            const code = document.getElementById('export-json-textarea').value;
+            copyTextToClipboard(code, 'Đã sao chép mã dữ liệu để gửi cho bạn bè!');
+        }
+
+        function importData(mergeMode) {
+            const raw = document.getElementById('import-json-textarea').value.trim();
+            if (!raw) {
+                showToast('Vui lòng dán mã dữ liệu vào ô trước!', 'warning');
+                return;
+            }
+            try {
+                const parsed = JSON.parse(raw);
+                if (!parsed || !Array.isArray(parsed.members)) {
+                    throw new Error('Invalid format');
+                }
+
+                if (!mergeMode) {
+                    state = { ...state, ...parsed };
+                    state.activeMemberId = state.members[0]?.id || null;
+                    showToast('Đã thay thế toàn bộ lịch từ mã dữ liệu!');
+                } else {
+                    // Merge members by name
+                    let added = 0;
+                    let updated = 0;
+                    parsed.members.forEach(incMem => {
+                        const existing = state.members.find(m => m.name.toLowerCase() === incMem.name.toLowerCase());
+                        if (existing) {
+                            existing.busy = { ...existing.busy, ...incMem.busy };
+                            updated++;
+                        } else {
+                            state.members.push({
+                                ...incMem,
+                                id: 'mem_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                                color: AVATAR_COLORS[state.members.length % AVATAR_COLORS.length]
+                            });
+                            added++;
+                        }
+                    });
+                    showToast(`Đã gộp thành công (${added} người mới, cập nhật ${updated} người)!`);
+                }
+
+                saveState();
+                closeShareModal();
+                renderAll();
+            } catch (e) {
+                showToast('Mã dữ liệu không hợp lệ, vui lòng kiểm tra lại!', 'warning');
+            }
+        }
+
+        // ==========================================
+        // DEMO & DIALOG HELPERS
+        // ==========================================
+        function loadDemoData() {
+            const today = new Date();
+            const future = new Date();
+            future.setDate(today.getDate() + 13);
+            state.startDate = formatDateISO(today);
+            state.endDate = formatDateISO(future);
+            state.title = 'Kèo Đi Đà Lạt / Camping Cuối Tuần 🏕️';
+            createDefaultSampleMembers();
+            renderAll();
+            showToast('Đã tạo dữ liệu mẫu gồm 4 thành viên!');
+        }
+
+        function promptEditTitle() {
+            openCustomDialog({
+                title: 'Đổi tên kèo tụ tập',
+                desc: 'Nhập tên buổi đi chơi hoặc sự kiện của nhóm bạn:',
+                inputValue: state.title,
+                onConfirm: (val) => {
+                    if (val && val.trim()) {
+                        state.title = val.trim();
+                        saveState();
+                        renderAll();
+                        showToast('Đã đổi tên kèo!');
+                    }
+                }
+            });
+        }
+
+        function confirmResetAll() {
+            openCustomDialog({
+                title: 'Làm mới toàn bộ lịch?',
+                desc: 'Tất cả danh sách thành viên và các ngày đã đánh dấu bận sẽ được xóa trắng để bạn tạo kèo mới.',
+                onConfirm: () => {
+                    state.members = [];
+                    state.activeMemberId = null;
+                    saveState();
+                    renderAll();
+                    showToast('Đã xóa toàn bộ dữ liệu cũ!');
+                }
+            });
+        }
+
+        function openCustomDialog({ title, desc, inputValue, onConfirm }) {
+            const modal = document.getElementById('custom-dialog-modal');
+            const titleEl = document.getElementById('dialog-title');
+            const descEl = document.getElementById('dialog-desc');
+            const inputEl = document.getElementById('dialog-input');
+            const confirmBtn = document.getElementById('dialog-confirm-btn');
+
+            titleEl.textContent = title;
+            if (desc) {
+                descEl.textContent = desc;
+                descEl.classList.remove('hidden');
+            } else {
+                descEl.classList.add('hidden');
+            }
+
+            if (typeof inputValue === 'string') {
+                inputEl.value = inputValue;
+                inputEl.classList.remove('hidden');
+                setTimeout(() => inputEl.focus(), 50);
+            } else {
+                inputEl.classList.add('hidden');
+            }
+
+            confirmBtn.onclick = () => {
+                const val = inputEl.value;
+                closeCustomDialog();
+                if (onConfirm) onConfirm(val);
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeCustomDialog() {
+            const modal = document.getElementById('custom-dialog-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        let toastTimer = null;
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            const iconEl = document.getElementById('toast-icon');
+
+            msgEl.textContent = msg;
+            if (type === 'warning') {
+                iconEl.className = 'fa-solid fa-triangle-exclamation text-amber-400 text-lg';
+            } else {
+                iconEl.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
